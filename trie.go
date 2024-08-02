@@ -199,7 +199,7 @@ func (t *Trie) put(curr node.Node, path []byte, value node.Node) node.Node {
 		panic("Leaf should be put with parent Extension")
 
 	case *node.Extension:
-		match := encoding.PrefixLen(path, current.Key)
+		match := encoding.CommonPrefixLen(path, current.Key)
 		if match == len(current.Key) { // Path longer than ext, travel down to next node.
 			next := t.put(current.Next, path[match:], value)
 

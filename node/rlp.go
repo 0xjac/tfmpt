@@ -56,7 +56,7 @@ func Decode(raw []byte, hashed Hashed) (Node, error) {
 		}
 
 		key := encoding.ExpandToHex(compactKey)
-		if encoding.KeyHasTerm(key) { // Leaf node
+		if encoding.HexKeyHasTerm(key) { // Leaf node
 			data, _, err := rlp.SplitString(rest)
 			if err != nil {
 				return nil, err
