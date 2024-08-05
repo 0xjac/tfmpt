@@ -44,19 +44,22 @@ func (b *Branch) ComputeHash() (Node, Node) {
 	return compact, cachedBranch
 }
 
-func (b *Branch) Hash() Hashed { return b.hash }
+func (b *Branch) Hash() Node {
+	// Hash the full node's children, caching the newly hashed subtrees
+	hashed := b.Copy()
 
-func (b *Branch) EncodeRLP(w io.Writer) error {
-	var branches [BranchSize]Node
-
-	for i, child := range &b.Children {
-		if child != nil {
-			branches[i] = child
+	for i := 0; i < BranchChildren; i++ {
+		if child := b.Children[i]; child != nil {
+			hashed.Children[i] = child.Hash()
 		} else {
-			branches[i] = Nil
+			hashed.Children[i] = nil
 		}
 	}
-	return rlp.Encode(w, branches)
+
+	return hash(hashed)
+	}
+
+	return h
 }
 
 func (b *Branch) Copy() *Branch {

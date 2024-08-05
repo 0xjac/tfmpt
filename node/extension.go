@@ -21,7 +21,18 @@ func (e *Extension) String() string {
 	return fmt.Sprintf("[%X, %s]", e.Key, e.Next)
 }
 
-func (e *Extension) Hash() Hashed { return e.hash }
+func (e *Extension) Hash() Node {
+	hashed := e.Copy()
+
+	hashed.Key = encoding.Compact(e.Key)
+
+	switch e.Next.(type) {
+	case *Branch, *Extension:
+		hashed.Next = e.Next.Hash()
+	}
+
+	return hash(hashed)
+}
 
 func (e *Extension) ComputeHash() (Node, Node) {
 	if e.hash != nil {
