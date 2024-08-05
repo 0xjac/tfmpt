@@ -21,29 +21,6 @@ type Branch struct {
 	Cache    Hashed
 }
 
-func (b *Branch) ComputeHash() (Node, Node) {
-	if b.hash != nil {
-		return b, b.hash
-	}
-
-	compact := b.Copy()
-	cachedBranch := b.Copy()
-	for i := 0; i < encoding.AlphabetSize; i++ {
-		if b.Children[i] == nil {
-			compact.Children[i] = Nil
-		} else {
-			compact.Children[i], cachedBranch.Children[i] = b.Children[i].ComputeHash()
-		}
-	}
-
-	hashed := hashNode(cachedBranch)
-	if h, ok := hashed.(Hashed); ok {
-		cachedBranch.hash = h
-	}
-
-	return compact, cachedBranch
-}
-
 func (b *Branch) Hash() Node {
 	if b.Cache != nil {
 		return b.Cache

@@ -35,33 +35,14 @@ func (e *Extension) Hash() Node {
 		hashed.Next = e.Next.Hash()
 	}
 
-	return hash(hashed)
-}
-
-func (e *Extension) ComputeHash() (Node, Node) {
-	if e.hash != nil {
-		return e, e.hash
-	}
-
-	compact := e.Copy()
-	compact.Key = encoding.Compact(compact.Key)
-
-	cachedExtension := e.Copy()
-
-	switch nxt := e.Next.(type) {
-	case *Branch, *Extension:
-		compact.Next, cachedExtension.Next = nxt.ComputeHash()
-	}
-
-	hashed := hashNode(compact)
-	h, ok := hashed.(Hashed)
-	if ok {
-		cachedExtension.hash = h
+	hash := hashNode(hashed)
+	if cache, ok := hash.(Hashed); ok {
+		e.Cache = cache
 	} else {
-		cachedExtension.hash = nil
+		e.Cache = nil
 	}
 
-	return compact, cachedExtension
+	return hash
 }
 
 func (e *Extension) EncodeRLP(w io.Writer) error {
