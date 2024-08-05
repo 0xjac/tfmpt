@@ -93,23 +93,23 @@ func (t *Trie) Proof(key []byte) ([][]byte, error) {
 	nodes := make([]node.Node, 0, len(path)) // path len is an upper bound on the number of nodes.
 	nextNode := t.root
 
+	// Get all the nodes from the root to the node at the given key.
 	for len(path) > 0 && nextNode != nil {
 		switch current := nextNode.(type) {
 		case nil:
 			break
 
 		case *node.Branch:
-			nextNode = current.Children[key[0]]
-			key = key[1:]
+			nextNode = current.Children[path[0]]
+			path = path[1:]
 			nodes = append(nodes, current)
 
 		case *node.Extension:
-			if len(path) < len(current.Key) || !bytes.Equal(current.Key, key[:len(current.Key)]) {
-				// The trie doesn't contain the key.
+			if len(path) < len(current.Key) || !bytes.Equal(current.Key, path[:len(current.Key)]) {
 				return nil, ErrNotFound
 			} else {
 				nextNode = current.Next
-				key = key[len(current.Key):]
+				path = path[len(current.Key):]
 			}
 			nodes = append(nodes, current)
 
@@ -122,23 +122,33 @@ func (t *Trie) Proof(key []byte) ([][]byte, error) {
 		return nil, ErrNotFound
 	}
 
+	// Generate the proof.
+	var (
+		candidate node.Node
+		hashed    node.Hashed
+		ok        bool
+		err       error
+		rlpEnc    []byte
+	)
+
 	proof := make([][]byte, 0, len(nodes)) // Nodes len is a safe upper bound.
 	for i, n := range nodes {
-		var hashedNode node.Node
+		candidate = n.Hash()
 
-		n, hashedNode = n.ComputeHash()
-
-		// Only consider the root or nodes with hashes for the proof.
-		if hash, ok := hashedNode.(node.Hashed); ok || i == 0 {
-			enc, err := rlp.EncodeToBytes(n)
-			if err != nil {
-				return nil, err
-			}
-
+		// Node.Hash() can return the node itself if its encoding is < 32 bytes.
+		// In this case, the node is included within its parent and should not
+		// be included in the proof directly.
+		// If this is the root (i == 0) then it must be included regardless.
+		if hashed, ok = candidate.(node.Hashed); ok || i == 0 {
 			if !ok {
-				hash = crypto.Keccak256(enc)
+				if rlpEnc, err = rlp.EncodeToBytes(n); err != nil {
+					return nil, err
+				}
+
+				hashed = crypto.Keccak256(rlpEnc)
 			}
-			proof = append(proof, hash)
+
+			proof = append(proof, hashed)
 		}
 	}
 
