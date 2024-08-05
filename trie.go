@@ -63,8 +63,13 @@ func (t *Trie) Put(key []byte, value []byte) {
 }
 
 func (t *Trie) Del(key []byte) error {
-	// TODO implement me
-	panic("implement me")
+	path := encoding.ToHex(key)
+	n, err := t.delete(t.root, nil, path)
+	if err != nil {
+		return err
+	}
+	t.root = n
+	return nil
 }
 
 func (t *Trie) Commit() []byte {
@@ -323,6 +328,121 @@ func (t *Trie) put(curr node.Node, path []byte, value node.Node) node.Node {
 
 	default:
 		panic(fmt.Sprintf("invalid node type: %T", current))
+	}
+}
+
+func (t *Trie) delete(n node.Node, prefix, key []byte) (node.Node, error) {
+	switch current := n.(type) {
+	case nil:
+		return nil, nil
+
+	case *node.Branch:
+		child, err := t.delete(current.Children[key[0]], append(prefix, key[0]), key[1:])
+		if err != nil {
+			return current, err
+		}
+		current = current.Copy()
+
+		current.Cache = nil
+		current.Children[key[0]] = child
+
+		// Branch has at least two children. If the new child is also not nil, it still has two
+		// children. Deletion is done. Otherwise, the branch might have to be reduced.
+		if child != nil {
+			return current, nil
+		}
+
+		// Count how many branches (children) are left.
+		lastBranch := -1
+		for i, c := range current.Children {
+			if c != nil {
+				if lastBranch == -1 { // Found first non-nil child at i.
+					lastBranch = i
+				} else {
+					lastBranch = -1 // Found a second non-nil child.
+					break
+				}
+			}
+		}
+
+		if lastBranch == -1 { // More than one child left. Branch is kept, nothing to do.
+			return current, nil
+		}
+
+		if lastBranch == node.BranchValue { // The last child is the value at the branch.
+			// Replace the branch with a new extension and the value. // TODO: Delete branch from DB.
+			return node.NewExtension(
+				[]byte{node.BranchValue}, current.Children[lastBranch], nil), nil
+		}
+
+		var newChild node.Node
+
+		// If the child is hashed, it must be loaded.
+		if hashed, ok := current.Children[lastBranch].(node.Hashed); ok {
+			if newChild, err = t.loadHashed(append(prefix, byte(lastBranch)), hashed); err != nil {
+				return nil, err
+			}
+		}
+
+		if extension, ok := newChild.(*node.Extension); ok {
+			extKey := append(make([]byte, 0, 1+len(extension.Key)), byte(lastBranch))
+
+			return node.NewExtension(append(extKey, extension.Key...), extension.Next, nil), nil
+		}
+
+		return nil, fmt.Errorf("unexpected node type: %T", newChild)
+
+	case node.Leaf:
+		return nil, nil
+
+	case *node.Extension:
+		match := encoding.CommonPrefixLen(key, current.Key)
+		switch {
+		case match < len(current.Key):
+			return current, ErrNotFound
+
+		case match == len(key): // Matches the extension (with a leaf).
+			return nil, nil // Remove the extension. // TODO: Delete from the DB.
+		}
+
+		// Key matches more than the current extension, move down to the next node.
+		nxt, err := t.delete(
+			current.Next,
+			append(prefix, key[:len(current.Key)]...),
+			key[len(current.Key):],
+		)
+
+		if err != nil {
+			return current, err
+		}
+
+		// If the next node is also an extension, merge it in the current one.
+		if childExt, ok := nxt.(*node.Extension); ok { // TODO: Delete childExt from DB.
+			return node.NewExtension( // Copy key to avoid memory sharing issues.
+				append(current.Key[:], childExt.Key[:]...),
+				childExt.Next,
+				nil,
+			), nil
+		}
+
+		return node.NewExtension(current.Key, nxt, nil), nil
+
+	case node.Hashed:
+		// The node is not loaded. Load it and continue the deletion from the actual node.
+		actual, err := t.loadHashed(prefix, current)
+		if err != nil {
+			return nil, err
+		}
+
+		newNode, err := t.delete(actual, prefix, key)
+		if err != nil {
+			return actual, err
+		}
+
+		return newNode, nil
+
+	default:
+		return nil, fmt.Errorf("unknown node type: %T", current)
 	}
 }
 
