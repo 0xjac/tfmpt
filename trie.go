@@ -48,9 +48,8 @@ type iTrie interface {
 }
 
 type Trie struct {
-	root  node.Node
-	store *store.Store
-	db    store.DB
+	root node.Node
+	db   store.DB
 }
 
 func (t *Trie) Get(key []byte) ([]byte, error) {
@@ -328,9 +327,9 @@ func (t *Trie) put(curr node.Node, path []byte, value node.Node) node.Node {
 }
 
 func NewEmptyTrie(db store.DB) *Trie {
-	return &Trie{root: nil, db: db, store: store.New(db)}
+	return &Trie{root: nil, db: db}
 }
 
 func LoadTrie(db store.DB, root node.Hashed) *Trie {
-	return &Trie{root: root, db: db, store: store.New(db)}
+	return &Trie{root: root, db: db}
 }
