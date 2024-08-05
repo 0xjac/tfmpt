@@ -48,8 +48,9 @@ type iTrie interface {
 }
 
 type Trie struct {
-	root node.Node
-	db   store.DB
+	root    node.Node
+	db      store.DB
+	deleted map[string]struct{}
 }
 
 func (t *Trie) Get(key []byte) ([]byte, error) {
@@ -79,6 +80,12 @@ func (t *Trie) Commit() []byte {
 
 	if t.db == nil {
 		panic("db is not set")
+	}
+
+	for key := range t.deleted {
+		if err := t.db.Delete([]byte(key)); err != nil {
+			panic(err)
+		}
 	}
 
 	hashedRoot, err := t.commit(nil, t.root)
@@ -378,15 +385,16 @@ func (t *Trie) delete(n node.Node, prefix, key []byte) (node.Node, error) {
 		}
 
 		if lastBranch == node.BranchValue { // The last child is the value at the branch.
-			// Replace the branch with a new extension and the value. // TODO: Delete branch from DB.
+			// Replace the branch with a new extension and the value.
+			t.deleted[string(append(prefix, node.BranchValue))] = struct{}{}
 			return node.NewExtension(
 				[]byte{node.BranchValue}, current.Children[lastBranch], nil), nil
 		}
 
-		var newChild node.Node
+		newChild := current.Children[lastBranch]
 
 		// If the child is hashed, it must be loaded.
-		if hashed, ok := current.Children[lastBranch].(node.Hashed); ok {
+		if hashed, ok := newChild.(node.Hashed); ok {
 			if newChild, err = t.loadHashed(append(prefix, byte(lastBranch)), hashed); err != nil {
 				return nil, err
 			}
@@ -410,7 +418,8 @@ func (t *Trie) delete(n node.Node, prefix, key []byte) (node.Node, error) {
 			return current, ErrNotFound
 
 		case match == len(key): // Matches the extension (with a leaf).
-			return nil, nil // Remove the extension. // TODO: Delete from the DB.
+			t.deleted[string(prefix)] = struct{}{} // Mark the node for deletion from the DB.
+			return nil, nil                        // Remove the extension.
 		}
 
 		// Key matches more than the current extension, move down to the next node.
@@ -425,7 +434,10 @@ func (t *Trie) delete(n node.Node, prefix, key []byte) (node.Node, error) {
 		}
 
 		// If the next node is also an extension, merge it in the current one.
-		if childExt, ok := nxt.(*node.Extension); ok { // TODO: Delete childExt from DB.
+		if childExt, ok := nxt.(*node.Extension); ok {
+			// Mark the node for deletion from the DB.
+			t.deleted[string(append(prefix, current.Key...))] = struct{}{}
+
 			return node.NewExtension( // Copy key to avoid memory sharing issues.
 				append(current.Key[:], childExt.Key[:]...),
 				childExt.Next,
@@ -455,9 +467,9 @@ func (t *Trie) delete(n node.Node, prefix, key []byte) (node.Node, error) {
 }
 
 func NewEmptyTrie(db store.DB) *Trie {
-	return &Trie{root: nil, db: db}
+	return &Trie{root: nil, db: db, deleted: make(map[string]struct{})}
 }
 
 func LoadTrie(db store.DB, root node.Hashed) *Trie {
-	return &Trie{root: root, db: db}
+	return &Trie{root: root, db: db, deleted: make(map[string]struct{})}
 }
