@@ -70,12 +70,12 @@ func (e *Extension) EncodeRLP(w io.Writer) error {
 	eb.WriteBytes(e.Key)
 
 	if e.Next == nil {
-		eb.Write(rlp.EmptyString)
-	} else {
-		if encNext, err := rlp.EncodeToBytes(e.Next); err != nil {
+		if _, err := eb.Write(rlp.EmptyString); err != nil {
 			return err
-		} else {
-			eb.Write(encNext)
+		}
+	} else {
+		if err := rlp.Encode(eb, e.Next); err != nil {
+			return err
 		}
 	}
 

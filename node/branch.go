@@ -69,6 +69,27 @@ func (b *Branch) Hash() Node {
 	return hash
 }
 
+func (b *Branch) EncodeRLP(w io.Writer) error {
+	eb := rlp.NewEncoderBuffer(w)
+	offset := eb.List()
+
+	for _, child := range &b.Children {
+		if child == nil {
+			if _, err := eb.Write(rlp.EmptyString); err != nil {
+				return err
+			}
+		} else {
+			if err := rlp.Encode(eb, child); err != nil {
+				return err
+			}
+		}
+	}
+
+	eb.ListEnd(offset)
+
+	return nil
+}
+
 func (b *Branch) Copy() *Branch {
 	deref := *b
 	return &deref
