@@ -60,7 +60,7 @@ func (t *Trie) Get(key []byte) ([]byte, error) {
 
 func (t *Trie) Put(key []byte, value []byte) {
 	path := encoding.ToHex(key)
-	t.root = t.put(t.root, path, node.Leaf(value))
+	t.root = t.put(t.root, path, 0, node.Leaf(value))
 }
 
 func (t *Trie) Del(key []byte) error {
@@ -297,20 +297,20 @@ func (t *Trie) loadHashed(path []byte, hashed node.Hashed) (node.Node, error) {
 	return n, nil
 }
 
-func (t *Trie) put(curr node.Node, path []byte, value node.Node) node.Node {
-	if len(path) == 0 { // Trivial we just return the node
+func (t *Trie) put(curr node.Node, path []byte, depth int, value node.Node) node.Node {
+	if len(path[depth:]) == 0 { // Trivial we just return the node
 		return value
 	}
 
 	switch current := curr.(type) {
 	case nil:
-		return node.NewExtension(path, value, nil)
+		return node.NewExtension(path[depth:], value, nil)
 
 	case *node.Branch:
-		branchKey := path[0]
+		branchKey := path[depth]
 
 		current = current.Copy()
-		current.Children[branchKey] = t.put(current.Children[branchKey], path[1:], value)
+		current.Children[branchKey] = t.put(current.Children[branchKey], path, depth+1, value)
 
 		return current
 
@@ -318,9 +318,9 @@ func (t *Trie) put(curr node.Node, path []byte, value node.Node) node.Node {
 		panic("Leaf should be put with parent Extension")
 
 	case *node.Extension:
-		match := encoding.CommonPrefixLen(path, current.Key)
+		match := encoding.CommonPrefixLen(path[depth:], current.Key)
 		if match == len(current.Key) { // Path longer than ext, travel down to next node.
-			next := t.put(current.Next, path[match:], value)
+			next := t.put(current.Next, path, depth+match, value)
 
 			return node.NewExtension(current.Key, next, nil)
 		}
@@ -329,17 +329,26 @@ func (t *Trie) put(curr node.Node, path []byte, value node.Node) node.Node {
 		branch := node.NewBranch(nil)
 
 		// Insert extension's next as new child.
-		branch.Children[current.Key[match]] = t.put(nil, current.Key[match+1:], current.Next)
+		branch.Children[current.Key[match]] = t.put(nil, current.Key, match+1, current.Next)
 
 		// Insert value as new child.
-		branch.Children[path[match]] = t.put(nil, path[match+1:], value)
+		branch.Children[path[depth+match]] = t.put(nil, path, depth+match+1, value)
 
 		if match == 0 { // No path before the branch, so no need for an extension.
 			return branch
 		}
 
 		// Create extension pointing to the branch:
-		return node.NewExtension(path[:match], branch, nil)
+		return node.NewExtension(path[depth:depth+match], branch, nil)
+
+	case node.Hashed:
+		// The node is not loaded. Load it and continue the insertion from the actual node.
+		actual, err := t.loadHashed(path[:depth], current)
+		if err != nil {
+			panic(err)
+		}
+
+		return t.put(actual, path, depth, value)
 
 	default:
 		panic(fmt.Sprintf("invalid node type: %T", current))
