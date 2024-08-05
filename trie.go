@@ -167,29 +167,39 @@ func (t *Trie) Proof(key []byte) ([][]byte, error) {
 	path := encoding.ToHex(key)
 	nodes := make([]node.Node, 0, len(path)) // path len is an upper bound on the number of nodes.
 	nextNode := t.root
+	depth := 0
 
 	// Get all the nodes from the root to the node at the given key.
-	for len(path) > 0 && nextNode != nil {
+	for depth < len(path) {
 		switch current := nextNode.(type) {
 		case nil:
-			break
+			return nil, ErrNotFound
 
 		case *node.Branch:
-			nextNode = current.Children[path[0]]
-			path = path[1:]
+			nextNode = current.Children[path[depth]]
+			depth += 1
 			nodes = append(nodes, current)
 
 		case *node.Extension:
-			if len(path) < len(current.Key) || !bytes.Equal(current.Key, path[:len(current.Key)]) {
+			keyLen := len(current.Key)
+
+			if len(path)-depth < keyLen || !bytes.Equal(path[depth:depth+keyLen], current.Key) {
 				return nil, ErrNotFound
 			} else {
 				nextNode = current.Next
-				path = path[len(current.Key):]
+				depth += keyLen
+				nodes = append(nodes, current)
 			}
-			nodes = append(nodes, current)
+
+		case node.Hashed:
+			if actual, err := t.loadHashed(path[:depth], current); err != nil {
+				return nil, err
+			} else {
+				nextNode = actual
+			}
 
 		default:
-			return nil, fmt.Errorf("unknown node type: %T", current)
+			return nil, fmt.Errorf("unexpected node type: %T", current)
 		}
 	}
 
