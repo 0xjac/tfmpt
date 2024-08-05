@@ -50,6 +50,7 @@ type iTrie interface {
 type Trie struct {
 	root  node.Node
 	store *store.Store
+	db    store.DB
 }
 
 func (t *Trie) Get(key []byte) ([]byte, error) {
@@ -72,20 +73,92 @@ func (t *Trie) Commit() []byte {
 		return emptyRoot
 	}
 
-	if t.store == nil {
-		panic("store is not set")
+	if t.db == nil {
+		panic("db is not set")
 	}
 
-	_, t.root = t.root.ComputeHash()
-
-	hashedRoot, err := t.store.Commit(t.root)
+	hashedRoot, err := t.commit(nil, t.root)
 	if err != nil {
 		panic(err)
+	} else if hashed, ok := hashedRoot.(node.Hashed); !ok {
+		panic(fmt.Sprintf("expected Hashed node, got: %T", hashedRoot))
+	} else {
+		t.root = hashed
+
+		return hashed
+	}
+}
+
+func (t *Trie) commit(path []byte, n node.Node) (node.Node, error) {
+	var err error
+
+	switch current := n.(type) {
+	case *node.Branch:
+		var (
+			nodes       [len(current.Children)]node.Node
+			hashedChild node.Hashed
+			ok          bool
+		)
+
+		for i := 0; i < node.BranchChildren; i++ {
+			if current.Children[i] == nil {
+				continue
+			}
+
+			if hashedChild, ok = current.Children[i].(node.Hashed); ok {
+				nodes[i] = hashedChild
+				continue
+			}
+
+			nodes[i], err = t.commit(append(path, byte(i)), current.Children[i])
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// Branch may hold a "Leaf" which must be explicitly included.
+		if current.Children[node.BranchValue] != nil {
+			nodes[node.BranchValue] = current.Children[node.BranchValue]
+		}
+
+		hashed := current.Copy()
+		hashed.Children = nodes
+
+		var rlpEnc []byte
+		if rlpEnc, err = rlp.EncodeToBytes(hashed); err != nil {
+			return nil, err
+		}
+
+		return hashed.Hash(), t.db.Put(path, rlpEnc)
+
+	case *node.Extension:
+		hashed := current.Copy()
+
+		if next, ok := hashed.Next.(*node.Branch); ok {
+			if hashed.Next, err = t.commit(append(path, hashed.Key...), next); err != nil {
+				return nil, err
+			}
+		}
+
+		hashed.Key = encoding.Compact(hashed.Key)
+
+		var rlpEnc []byte
+		if rlpEnc, err = rlp.EncodeToBytes(hashed); err != nil {
+			return nil, err
+		}
+
+		return hashed.Hash(), t.db.Put(path, rlpEnc)
+
+	case node.Hashed:
+		return current, nil
+
+	case node.Leaf:
+		return nil, fmt.Errorf("leaf should not be stored directly")
+
+	default:
+		return nil, fmt.Errorf("unknown node type: %T", current)
 	}
 
-	t.root = hashedRoot
-
-	return hashedRoot
 }
 
 func (t *Trie) Proof(key []byte) ([][]byte, error) {
@@ -176,7 +249,7 @@ func (t *Trie) get(curr node.Node, path []byte, depth int) ([]byte, error) {
 		return t.get(current.Next, path, depth+keylen) // Move through the extension.
 
 	case node.Hashed:
-		actual, err := t.store.Get(path[:depth], current)
+		actual, err := t.loadHashed(path[:depth], current)
 		if err != nil {
 			return nil, err
 		}
@@ -186,6 +259,23 @@ func (t *Trie) get(curr node.Node, path []byte, depth int) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unknown node type: %T", current)
 	}
+}
+
+func (t *Trie) loadHashed(path []byte, hashed node.Hashed) (node.Node, error) {
+	raw, err := t.db.Get(path)
+	switch {
+	case err != nil:
+		return nil, err
+	case raw == nil:
+		return nil, ErrNotFound
+	}
+
+	n, err := node.Decode(raw, hashed)
+	if err != nil {
+		return nil, fmt.Errorf("db: decode error: %v", err)
+	}
+
+	return n, nil
 }
 
 func (t *Trie) put(curr node.Node, path []byte, value node.Node) node.Node {
@@ -238,9 +328,9 @@ func (t *Trie) put(curr node.Node, path []byte, value node.Node) node.Node {
 }
 
 func NewEmptyTrie(db store.DB) *Trie {
-	return &Trie{root: nil, store: store.New(db)}
+	return &Trie{root: nil, db: db, store: store.New(db)}
 }
 
 func LoadTrie(db store.DB, root node.Hashed) *Trie {
-	return &Trie{root: root, store: store.New(db)}
+	return &Trie{root: root, db: db, store: store.New(db)}
 }
