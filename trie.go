@@ -285,7 +285,7 @@ func (t *Trie) put(curr node.Node, path []byte, value node.Node) node.Node {
 
 	switch current := curr.(type) {
 	case nil:
-		return node.NewExtension(path, value)
+		return node.NewExtension(path, value, nil)
 
 	case *node.Branch:
 		branchKey := path[0]
@@ -303,11 +303,11 @@ func (t *Trie) put(curr node.Node, path []byte, value node.Node) node.Node {
 		if match == len(current.Key) { // Path longer than ext, travel down to next node.
 			next := t.put(current.Next, path[match:], value)
 
-			return node.NewExtension(current.Key, next)
+			return node.NewExtension(current.Key, next, nil)
 		}
 
 		// Insert branch after matched prefix.
-		branch := node.NewBranch()
+		branch := node.NewBranch(nil)
 
 		// Insert extension's next as new child.
 		branch.Children[current.Key[match]] = t.put(nil, current.Key[match+1:], current.Next)
@@ -320,7 +320,7 @@ func (t *Trie) put(curr node.Node, path []byte, value node.Node) node.Node {
 		}
 
 		// Create extension pointing to the branch:
-		return node.NewExtension(path[:match], branch)
+		return node.NewExtension(path[:match], branch, nil)
 
 	default:
 		panic(fmt.Sprintf("invalid node type: %T", current))

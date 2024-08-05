@@ -18,7 +18,7 @@ var _ Node = (*Branch)(nil)
 
 type Branch struct {
 	Children [BranchSize]Node
-	hash     Hashed // hash is a cache for the hash value or nil.
+	Cache    Hashed
 }
 
 func (b *Branch) ComputeHash() (Node, Node) {
@@ -45,7 +45,10 @@ func (b *Branch) ComputeHash() (Node, Node) {
 }
 
 func (b *Branch) Hash() Node {
-	// Hash the full node's children, caching the newly hashed subtrees
+	if b.Cache != nil {
+		return b.Cache
+	}
+
 	hashed := b.Copy()
 
 	for i := 0; i < BranchChildren; i++ {
@@ -56,10 +59,14 @@ func (b *Branch) Hash() Node {
 		}
 	}
 
-	return hash(hashed)
+	hash := hashNode(hashed)
+	if cache, ok := hash.(Hashed); ok {
+		b.Cache = cache
+	} else {
+		b.Cache = nil
 	}
 
-	return h
+	return hash
 }
 
 func (b *Branch) Copy() *Branch {
@@ -67,4 +74,6 @@ func (b *Branch) Copy() *Branch {
 	return &deref
 }
 
-func NewBranch() *Branch { return &Branch{Children: [BranchSize]Node{}, hash: nil} }
+func NewBranch(cache Hashed) *Branch {
+	return &Branch{Children: [BranchSize]Node{}, Cache: cache}
+}

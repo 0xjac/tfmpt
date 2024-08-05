@@ -26,12 +26,3 @@ type Hashed []byte
 func (h Hashed) ComputeHash() (Node, Node) { return h, h }
 
 func (h Hashed) Hash() Node { return h }
-
-func hash(n Node) Node {
-	enc, _ := rlp.EncodeToBytes(n)
-	if len(enc) < 32 {
-		return n
-	}
-
-	return Hashed(crypto.Keccak256(enc))
-}

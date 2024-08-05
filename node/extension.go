@@ -12,9 +12,9 @@ import (
 var _ Node = (*Extension)(nil)
 
 type Extension struct {
-	Key  []byte
-	Next Node
-	hash Hashed // hash is a cache for the hash value or nil.
+	Key   []byte
+	Next  Node
+	Cache Hashed
 }
 
 func (e *Extension) String() string {
@@ -22,6 +22,10 @@ func (e *Extension) String() string {
 }
 
 func (e *Extension) Hash() Node {
+	if e.Cache != nil {
+		return e.Cache
+	}
+
 	hashed := e.Copy()
 
 	hashed.Key = encoding.Compact(e.Key)
@@ -85,6 +89,6 @@ func (e *Extension) Copy() *Extension {
 	return &deref
 }
 
-func NewExtension(key []byte, next Node) *Extension {
-	return &Extension{Key: key, Next: next}
+func NewExtension(key []byte, next Node, cache Hashed) *Extension {
+	return &Extension{Key: key, Next: next, Cache: cache}
 }

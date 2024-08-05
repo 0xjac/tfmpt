@@ -16,22 +16,7 @@ func hashNode(n Node) Node {
 	}
 
 	if len(rlpEnc) < 32 {
-		// If node is an extension with a small leaf, it should still be hashed.
-		if ext, ok := n.(*Extension); ok {
-			if _, ok = ext.Next.(Leaf); ok {
-				tmp := Hashed(crypto.Keccak256(rlpEnc))
-				return tmp
-			}
-			return ext
-		}
-
 		return n
-	}
-
-	if e, ok := n.(*Extension); ok {
-		if _, ok := e.Next.(Leaf); ok {
-			return Hashed(crypto.Keccak256(rlpEnc))
-		}
 	}
 
 	return Hashed(crypto.Keccak256(rlpEnc))
@@ -62,9 +47,7 @@ func Decode(raw []byte, hashed Hashed) (Node, error) {
 				return nil, err
 			}
 
-			ext := NewExtension(key, Leaf(data))
-
-			ext.hash = hashed
+			ext := NewExtension(key, Leaf(data), hashed)
 
 			return ext, nil
 		}
@@ -74,14 +57,12 @@ func Decode(raw []byte, hashed Hashed) (Node, error) {
 			return nil, err
 		}
 
-		ext := NewExtension(key, next)
-
-		ext.hash = hashed
+		ext := NewExtension(key, next, hashed)
 
 		return ext, nil
 
 	case BranchSize:
-		b := NewBranch()
+		b := NewBranch(hashed)
 
 		for i := 0; i < BranchChildren; i++ {
 			child, rest, err := decodeHashedChild(items)
