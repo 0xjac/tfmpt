@@ -98,60 +98,58 @@ func (t *Trie) commit(path []byte, n node.Node) (node.Node, error) {
 
 	switch current := n.(type) {
 	case *node.Branch:
-		var (
-			nodes       [len(current.Children)]node.Node
-			hashedChild node.Hashed
-			ok          bool
-		)
+		var ok bool
+
+		hash := current.Hash()
 
 		for i := 0; i < node.BranchChildren; i++ {
 			if current.Children[i] == nil {
 				continue
 			}
 
-			if hashedChild, ok = current.Children[i].(node.Hashed); ok {
-				nodes[i] = hashedChild
+			if _, ok = current.Children[i].(node.Hashed); ok {
 				continue
 			}
 
-			nodes[i], err = t.commit(append(path, byte(i)), current.Children[i])
+			current.Children[i], err = t.commit(append(path, byte(i)), current.Children[i])
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		// Branch may hold a "Leaf" which must be explicitly included.
-		if current.Children[node.BranchValue] != nil {
-			nodes[node.BranchValue] = current.Children[node.BranchValue]
-		}
-
-		hashed := current.Copy()
-		hashed.Children = nodes
-
 		var rlpEnc []byte
-		if rlpEnc, err = rlp.EncodeToBytes(hashed); err != nil {
+		if rlpEnc, err = rlp.EncodeToBytes(current); err != nil {
 			return nil, err
 		}
 
-		return hashed.Hash(), t.db.Put(path, rlpEnc)
+		if _, ok = hash.(node.Hashed); ok {
+			return hash, t.db.Put(path, rlpEnc)
+		}
+
+		return hash, nil
 
 	case *node.Extension:
-		hashed := current.Copy()
+		hash := current.Hash()
 
-		if next, ok := hashed.Next.(*node.Branch); ok {
-			if hashed.Next, err = t.commit(append(path, hashed.Key...), next); err != nil {
+		if next, ok := current.Next.(*node.Branch); ok {
+			if current.Next, err = t.commit(append(path, current.Key...), next); err != nil {
 				return nil, err
 			}
 		}
 
-		hashed.Key = encoding.Compact(hashed.Key)
+		// The key must be compacted first for RLP encoding.
+		current.Key = encoding.Compact(current.Key)
 
 		var rlpEnc []byte
-		if rlpEnc, err = rlp.EncodeToBytes(hashed); err != nil {
+		if rlpEnc, err = rlp.EncodeToBytes(current); err != nil {
 			return nil, err
 		}
 
-		return hashed.Hash(), t.db.Put(path, rlpEnc)
+		if _, ok := hash.(node.Hashed); ok {
+			return hash, t.db.Put(path, rlpEnc)
+		}
+
+		return hash, nil
 
 	case node.Hashed:
 		return current, nil
@@ -215,7 +213,7 @@ func (t *Trie) Proof(key []byte) ([][]byte, error) {
 		// Node.Hash() can return the node itself if its encoding is < 32 bytes.
 		// In this case, the node is included within its parent and should not
 		// be included in the proof directly.
-		// If this is the root (i == 0) then it must be included regardless.
+		// If this is the root (i == 0), then it must be included regardless.
 		if hashed, ok = candidate.(node.Hashed); ok || i == 0 {
 			if !ok {
 				if rlpEnc, err = rlp.EncodeToBytes(n); err != nil {
@@ -240,7 +238,7 @@ func (t *Trie) get(curr node.Node, path []byte, depth int) ([]byte, error) {
 	case *node.Branch:
 		return t.get(current.Children[path[depth]], path, depth+1)
 
-	case node.Leaf: // Reached end of trie.
+	case node.Leaf: // Reached the end of trie.
 		return current, nil
 	case *node.Extension:
 		keylen := len(current.Key)
