@@ -90,6 +90,7 @@ Thus the resulting terms are roughly constant from block $h_1$ to block $h$.
 That is:
 
 $$T_h = R_h \cdot d_r \cdot R + W_h \cdot d_w \cdot W\hspace{2em}$$
+  
 $$\hspace{4em}\approx R_{h_1} \cdot d_r \cdot R + W_{h-1} \cdot d_w \cdot W = T_{h-1}$$
 
 Hence $T_h \approx T_{h_1}$, the time to process a block is similar to, and *independent of* the time to process the previous block.
