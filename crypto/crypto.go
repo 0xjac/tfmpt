@@ -1,3 +1,5 @@
+// Copyright (C) 2024 Jacques Dafflon | 0xjac - All Rights Reserved
+
 // Package crypto shamelessly taken from github.com/ethereum/go-ethereum/crypto to avoid the warning
 // related to the import of golang.org/x/crypto v0.22.0 which contains the vulnerability
 // CVE-2023-42818.

@@ -1,3 +1,5 @@
+// Copyright (C) 2024 Jacques Dafflon | 0xjac - All Rights Reserved
+
 package encoding_test
 
 import (
