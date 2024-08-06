@@ -1,6 +1,6 @@
 // Copyright (C) 2024 Jacques Dafflon | 0xjac - All Rights Reserved
 
-module tfmpt.local
+module go.0xjac.com/tfmpt
 
 go 1.22
 

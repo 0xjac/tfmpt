@@ -5,7 +5,7 @@ package encoding_test
 import (
 	"fmt"
 
-	"tfmpt.local/encoding"
+	"go.0xjac.com/tfmpt/encoding"
 )
 
 func ExampleToHex() {

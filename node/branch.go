@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"tfmpt.local/encoding"
+	"go.0xjac.com/tfmpt/encoding"
 )
 
 const (

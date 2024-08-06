@@ -7,8 +7,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"tfmpt.local/crypto"
-	"tfmpt.local/encoding"
+	"go.0xjac.com/tfmpt/crypto"
+	"go.0xjac.com/tfmpt/encoding"
 )
 
 func hashNode(n Node) Node {

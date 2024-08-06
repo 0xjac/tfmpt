@@ -3,7 +3,7 @@ package node_test
 import (
 	"fmt"
 
-	"tfmpt.local/node"
+	"go.0xjac.com/tfmpt/node"
 )
 
 func ExampleDecode() {

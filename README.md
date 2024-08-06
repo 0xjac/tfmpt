@@ -1,6 +1,6 @@
 <!-- Copyright (C) 2024 Jacques Dafflon | 0xjac - All Rights Reserved -->
 
-# TFMPT
+# go.0xjac.com/tfmpt
 
 The implementation is based on the following sources:
 
@@ -30,6 +30,12 @@ task: Available tasks for this project:
 * clean:       Clean up generated files.
 * cover:       Run all the go tests with coverage.
 * test:        Run all the go tests.
+```
+
+## Install
+
+```shell
+GOPRIVATE=go.0xjac.com/tfmpt go get -u go.0xjac.com/tfmpt@latest
 ```
 
 ## Computational Cost Analysis of Block Processing

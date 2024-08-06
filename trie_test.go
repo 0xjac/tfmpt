@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/trie"
 
-	"tfmpt.local/store"
+	"go.0xjac.com/tfmpt/store"
 )
 
 func TestTrieGet(t *testing.T) {

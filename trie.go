@@ -9,10 +9,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/rlp"
 
-	"tfmpt.local/crypto"
-	"tfmpt.local/encoding"
-	"tfmpt.local/node"
-	"tfmpt.local/store"
+	"go.0xjac.com/tfmpt/crypto"
+	"go.0xjac.com/tfmpt/encoding"
+	"go.0xjac.com/tfmpt/node"
+	"go.0xjac.com/tfmpt/store"
 )
 
 var (
