@@ -18,7 +18,7 @@ type Extension struct {
 }
 
 func (e *Extension) String() string {
-	return fmt.Sprintf("[%X, %s]", e.Key, e.Next)
+	return fmt.Sprintf("[% x, %s]", e.Key, e.Next)
 }
 
 func (e *Extension) Hash() Node {
