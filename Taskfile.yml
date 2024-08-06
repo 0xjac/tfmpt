@@ -1,0 +1,17 @@
+version: '3'
+
+tasks:
+  test:
+    desc: Run all the go tests.
+    cmd: go test -race -v ./...
+
+  cover:
+    desc: Run all the go tests with coverage.
+    cmds:
+      - go test -coverpkg=./... -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out
+
+  clean:
+    desc: Clean up generated files.
+    cmd: rm coverage.out
+
