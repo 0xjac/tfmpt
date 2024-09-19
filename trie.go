@@ -17,6 +17,7 @@ import (
 
 var (
 	ErrNotFound = errors.New("not found")
+	ErrNodeType = errors.New("bad node type")
 
 	// emptyRoot is the precomputed hash of an empty MPT.
 	// It is equivalent to keccak256(rlp(byte(0)).
@@ -167,7 +168,7 @@ func (t *Trie) commit(path []byte, n node.Node) (node.Node, error) {
 		return nil, fmt.Errorf("leaf should not be stored directly")
 
 	default:
-		return nil, fmt.Errorf("unknown node type: %T", current)
+		return nil, fmt.Errorf("%w: %T unknown", ErrNodeType, current)
 	}
 
 }
@@ -208,7 +209,7 @@ func (t *Trie) Proof(key []byte) ([][]byte, error) {
 			}
 
 		default:
-			return nil, fmt.Errorf("unexpected node type: %T", current)
+			return nil, fmt.Errorf("%w: %T unexpected", ErrNodeType, current)
 		}
 	}
 
@@ -417,7 +418,7 @@ func (t *Trie) delete(n node.Node, prefix, key []byte) (node.Node, error) {
 			return node.NewExtension(append(extKey, extension.Key...), extension.Next, nil), nil
 		}
 
-		return nil, fmt.Errorf("unexpected node type: %T", newChild)
+		return nil, fmt.Errorf("%w: %T unexpected", ErrNodeType, current)
 
 	case node.Leaf:
 		return nil, nil
@@ -473,7 +474,7 @@ func (t *Trie) delete(n node.Node, prefix, key []byte) (node.Node, error) {
 		return newNode, nil
 
 	default:
-		return nil, fmt.Errorf("unknown node type: %T", current)
+		return nil, fmt.Errorf("%w: %T unknown", ErrNodeType, current)
 	}
 }
 
